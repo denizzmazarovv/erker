@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Админка проектов</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 20px;
+      display: block;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+    .project {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin: 20px 0;
+      border-radius: 8px;
+    }
+    .actions {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Админка проектов</h1>
+
+  <!-- Список проектов -->
+  <div id="projectsList"></div>
+
+  <hr />
+
+  <!-- Форма -->
+  <h2 id="formTitle">Добавить проект</h2>
+
+  <form id="projectForm" action="/upload" method="POST" enctype="multipart/form-data">
+    <label>Название (RU 🇷🇺):</label>
+    <input type="text" name="title_ru" required />
+    <label>Название (EN 🇺🇸):</label>
+    <input type="text" name="title_en" required />
+    <label>Название (UZ 🇺🇿):</label>
+    <input type="text" name="title_uz" required />
+
+    <label>Описание (RU 🇷🇺):</label>
+    <textarea name="desc_ru" required></textarea>
+    <label>Описание (EN 🇺🇸):</label>
+    <textarea name="desc_en" required></textarea>
+    <label>Описание (UZ 🇺🇿):</label>
+    <textarea name="desc_uz" required></textarea>
+
+    <label>Площадь:</label>
+    <input type="text" name="area" required />
+    <label>Год:</label>
+    <input type="text" name="year" required />
+
+    <label>Главное изображение:</label>
+    <input type="file" name="mainImage" accept="image/*" />
+
+    <label>Галерея 1:</label>
+    <input type="file" name="galleryImage1" accept="image/*" />
+    <label>Галерея 2:</label>
+    <input type="file" name="galleryImage2" accept="image/*" />
+    <label>Галерея 3:</label>
+    <input type="file" name="galleryImage3" accept="image/*" />
+
+    <input type="hidden" name="folderName" id="folderName" />
+    <button type="submit">Сохранить</button>
+  </form>
+
+  <script>
+    const form = document.getElementById("projectForm");
+    const list = document.getElementById("projectsList");
+    const formTitle = document.getElementById("formTitle");
+    let editFolder = null;
+
+    async function loadProjects() {
+      const data = await fetch("/public/data.json").then((res) => res.json());
+      const translations = await fetch("/public/translations.json").then((res) => res.json());
+
+      list.innerHTML = "";
+
+      for (const item of data) {
+        const folder = item.folder;
+        const translation = translations[folder];
+
+        const title = translation?.title?.ru || folder;
+
+        const div = document.createElement("div");
+        div.className = "project";
+        div.innerHTML = `
+          <strong>${title}</strong> (${item.area} м², ${item.year})<br/>
+          <em>${folder}</em>
+          <div class="actions">
+            <button onclick="editProject('${folder}')">✏️ Редактировать</button>
+            <button onclick="deleteProject('${folder}')">🗑 Удалить</button>
+          </div>
+        `;
+        list.appendChild(div);
+      }
+    }
+
+    async function deleteProject(folder) {
+      if (confirm("Удалить проект?")) {
+        await fetch(`/delete?folder=${encodeURIComponent(folder)}`);
+        loadProjects();
+      }
+    }
+
+    async function editProject(folder) {
+      const data = await fetch("/public/data.json").then((res) => res.json());
+      const translations = await fetch("/public/translations.json").then((res) => res.json());
+
+      const project = data.find((p) => p.folder === folder);
+      const translation = translations[folder];
+
+      if (!project || !translation) return;
+
+      form.title_ru.value = translation.title.ru;
+      form.title_en.value = translation.title.en;
+      form.title_uz.value = translation.title.uz;
+      form.desc_ru.value = translation.description.ru;
+      form.desc_en.value = translation.description.en;
+      form.desc_uz.value = translation.description.uz;
+      form.area.value = project.area;
+      form.year.value = project.year;
+      formTitle.textContent = "Редактировать проект";
+
+      editFolder = folder;
+      document.getElementById("folderName").value = folder;
+    }
+
+    form.addEventListener("submit", () => {
+      if (!editFolder) {
+        const name = form.title_en.value.trim().toLowerCase().replace(/\s+/g, "");
+        const area = form.area.value.trim().toLowerCase().replace(/\s+/g, "");
+        const folder = name + area;
+        document.getElementById("folderName").value = folder;
+      }
+    });
+
+    loadProjects();
+  </script>
+</body>
+</html>
